@@ -1,0 +1,40 @@
+{% set payment_methods = ['credit_card', 'coupon', 'bank_transfer', 'gift_card'] %}
+
+let orders = from {{ ref('stg_orders') }}
+let payments = from {{ ref('stg_payments') }}
+let order_payments = (
+    from payments
+    group order_id (aggregate [
+        
+        {# this does not work sadly
+        {% for payment_method in payment_methods -%}
+        {{ payment_method }}_amount = sum (switch [payment_method == '{{ payment_method }}' -> amount, true -> 0]),
+        {% endfor -%}
+        #}
+
+        total_amount = sum amount
+    ])
+)
+
+let final = (
+    from orders
+    join order_payments side:left [==order_id]
+    select [
+        orders.order_id,
+        orders.customer_id,
+        orders.order_date,
+        orders.status,
+
+        {#
+        {% for payment_method in payment_methods -%}
+
+        order_payments.{{ payment_method }}_amount,
+
+        {% endfor -%}
+        #}
+
+        amount = order_payments.total_amount
+    ]
+)
+
+from final

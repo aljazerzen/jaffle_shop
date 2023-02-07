@@ -1,0 +1,33 @@
+let customers = from {{ ref('stg_customers') }}
+let orders = from {{ ref('stg_orders') }}
+let payments = from {{ ref('stg_payments') }}
+
+let customer_orders = (
+    from orders
+    group customer_id (aggregate [
+        first_order = min order_date,
+        most_recent_order = max order_date,
+        number_of_orders = count order_id,
+    ])
+)
+
+let customer_payments = (
+    from payments
+    join orders side:left [==order_id]
+    group orders.customer_id (aggregate [
+        total_amount = sum payments.amount
+    ])
+)
+
+from c=customers
+join o=customer_orders side:left [==customer_id]
+join p=customer_payments side:left [==customer_id]
+select [
+    c.customer_id,
+    c.first_name,
+    c.last_name,
+    o.first_order,
+    o.most_recent_order,
+    o.number_of_orders,
+    customer_lifetime_value = p.total_amount,
+]
